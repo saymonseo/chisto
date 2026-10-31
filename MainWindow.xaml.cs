@@ -50,7 +50,7 @@ public partial class MainWindow : Window
             item.Foreground = item == button ? (Brush)FindResource("Lime") : new SolidColorBrush(Color.FromRgb(155, 174, 203));
         }
         PageTitle.Text = page == MapPage ? "Пространство под контролем" : page == FilesPage ? "Крупные файлы" : page == DuplicatesPage ? "Одинаковое содержимое" : page == AppDataPage ? "Что хранят приложения" : page == UpdatesPage ? "Всегда актуальная версия" : "Очистка приложений";
-        PageIntro.Text = page == MapPage ? "Карта папок и точный учёт объёма доступных файлов." : page == FilesPage ? "Полные пути, размеры и назначение системных файлов." : page == DuplicatesPage ? "Сначала размер, затем SHA-256 всего содержимого." : page == AppDataPage ? "Разберите AppData по приложениям, а не удаляйте её целиком." : page == UpdatesPage ? "Новые версии из вашего репозитория GitHub Releases." : "Предварительный список файлов и отдельное подтверждение удаления.";
+        PageIntro.Text = page == MapPage ? "Карта папок и точный учёт объёма доступных файлов." : page == FilesPage ? "Самые объёмные файлы выбранной области и их расположение." : page == DuplicatesPage ? "Сначала размер, затем SHA-256 всего содержимого." : page == AppDataPage ? "Разберите AppData по приложениям, а не удаляйте её целиком." : page == UpdatesPage ? "Новые версии из вашего репозитория GitHub Releases." : "Предварительный список файлов и отдельное подтверждение удаления.";
         if (page == MapPage) Dispatcher.BeginInvoke(DrawMap);
     }
     private void MapPage_Click(object sender, RoutedEventArgs e) => ShowPage(MapPage, NavMap);
@@ -166,7 +166,8 @@ public partial class MainWindow : Window
         var nodes = currentFolder.Children.Where(x => x.Bytes > 0).OrderByDescending(x => x.Bytes).ToList();
         var tiles = nodes.Take(10).Select(x => new Tile(x.Name, x.Bytes, x)).ToList();
         if (nodes.Count > 10) tiles.Add(new Tile($"Другие папки · {nodes.Count - 10}", nodes.Skip(10).Sum(x => x.Bytes), null));
-        if (currentFolder.DirectBytes > 0) tiles.Add(new Tile("Файлы в этой папке", currentFolder.DirectBytes, null));
+        if (currentFolder.SystemReserveBytes > 0) tiles.Add(new Tile("Системный резерв", currentFolder.SystemReserveBytes, null));
+        if (currentFolder.DirectBytes > currentFolder.SystemReserveBytes) tiles.Add(new Tile("Файлы в этой папке", currentFolder.DirectBytes - currentFolder.SystemReserveBytes, null));
         tiles = tiles.OrderByDescending(x => x.Bytes).ToList();
         DrawTiles(tiles, 0, 0, MapCanvas.ActualWidth, MapCanvas.ActualHeight, 0);
     }

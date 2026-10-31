@@ -8,6 +8,7 @@ using Microsoft.Win32.SafeHandles;
 namespace Chisto;
 public static class Format
 {
+    internal static bool ReserveName(ReadOnlySpan<char> name) => name.Equals("pagefile.sys", StringComparison.OrdinalIgnoreCase) || name.Equals("hiberfil.sys", StringComparison.OrdinalIgnoreCase) || name.Equals("swapfile.sys", StringComparison.OrdinalIgnoreCase);
     public static string Size(long bytes)
     {
         string[] units = ["Б", "КБ", "МБ", "ГБ", "ТБ"];
@@ -34,6 +35,7 @@ public sealed class FolderNode(string path, FolderNode? parent = null)
     public FolderNode? Parent { get; } = parent;
     public List<FolderNode> Children { get; } = [];
     public long DirectBytes { get; set; }
+    public long SystemReserveBytes { get; set; }
     public long Bytes { get; set; }
     public string DisplaySize => Format.Size(Bytes);
     public long Files { get; set; }
@@ -91,6 +93,7 @@ public static class DiskScanner
         foreach (var node in allNodes)
         {
             token.ThrowIfCancellationRequested(); long seen = 0;
+            bool driveRoot = string.Equals(Path.TrimEndingDirectorySeparator(node.Path), Path.TrimEndingDirectorySeparator(Path.GetPathRoot(node.Path)!), StringComparison.OrdinalIgnoreCase);
             // A new junction inserted after the count pass must not be traversed.
             try { if ((File.GetAttributes(node.Path) & FileAttributes.ReparsePoint) != 0) { workDone += node.PlannedFiles; foldersDone++; continue; } }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { if (failedPaths.Add(node.Path)) errors++; workDone += node.PlannedFiles; foldersDone++; continue; }
@@ -98,20 +101,14 @@ public static class DiskScanner
             {
                 foreach (var file in new FileSystemEnumerable<ScanEntry>(node.Path, (ref FileSystemEntry e) =>
                 {
-                    bool take = !e.IsDirectory && (e.Length >= 1024 * 1024 || largest.Count < 1000 || (largest.TryPeek(out _, out var minimum) && e.Length > minimum));
+                    bool take = !e.IsDirectory && (driveRoot && Format.ReserveName(e.FileName) || e.Length >= 1024 * 1024 || largest.Count < 1000 || (largest.TryPeek(out _, out var minimum) && e.Length > minimum));
                     return new ScanEntry(e.IsDirectory, e.Attributes, e.Length, e.LastWriteTimeUtc.UtcDateTime, take ? e.ToFullPath() : null);
                 }, options))
                 {
                     token.ThrowIfCancellationRequested();
                     if (file.Directory || (file.Attributes & FileAttributes.ReparsePoint) != 0) continue;
-                    seen++; count++; total += file.Bytes; node.DirectBytes += file.Bytes; node.Files++;
-                    if (file.Path != null)
-                    {
-                        var value = new DiskFile(file.Path, file.Bytes, file.Modified);
-                        if (largest.Count < 1000 || (largest.TryPeek(out _, out var minimum) && file.Bytes > minimum))
-                        { largest.Enqueue(value, file.Bytes); if (largest.Count > 1000) largest.Dequeue(); }
-                        if (file.Bytes >= 1024 * 1024 && (file.Attributes & (FileAttributes.System | FileAttributes.Offline)) == 0) candidates.Add(value);
-                    }
+                    seen++; count++; total += file.Bytes;
+                    ObserveFile(node, file.Path == null ? null : new DiskFile(file.Path, file.Bytes, file.Modified), file.Bytes, file.Attributes, largest, candidates);
                     if (timer.Elapsed >= next)
                     {
                         Report(false); next = timer.Elapsed + TimeSpan.FromMilliseconds(200);
@@ -136,6 +133,15 @@ public static class DiskScanner
         }
         progress?.Report(new ScanProgress(count, total, rootPath, "Готово", plannedFiles, allNodes.Count, allNodes.Count, 100, timer.Elapsed, TimeSpan.Zero));
         return new ScanResult(root, largest.UnorderedItems.Select(x => x.Element).OrderByDescending(x => x.Bytes).ToList(), candidates, count, errors, links, timer.Elapsed);
+    }
+    internal static void ObserveFile(FolderNode node, DiskFile? file, long bytes, FileAttributes attributes, PriorityQueue<DiskFile, long> largest, List<DiskFile> candidates)
+    {
+        node.DirectBytes += bytes; node.Files++;
+        if (file == null) return;
+        if (file.Protected) { node.SystemReserveBytes += bytes; return; }
+        if (largest.Count < 1000 || (largest.TryPeek(out _, out var minimum) && bytes > minimum))
+        { largest.Enqueue(file, bytes); if (largest.Count > 1000) largest.Dequeue(); }
+        if (bytes >= 1024 * 1024 && (attributes & (FileAttributes.System | FileAttributes.Offline)) == 0) candidates.Add(file);
     }
     private readonly record struct PlanEntry(bool Directory, bool Link, string? Path);
     private readonly record struct ScanEntry(bool Directory, FileAttributes Attributes, long Bytes, DateTime Modified, string? Path);

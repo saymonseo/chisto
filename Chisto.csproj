@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>Chisto</AssemblyName>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Product>Чисто</Product>
     <Description>Локальный анализ диска, поиск дубликатов и очистка кэшей</Description>

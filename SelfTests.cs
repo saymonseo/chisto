@@ -114,6 +114,16 @@ public static class SelfTests
             Assert(new DiskFile("C:\\pagefile.sys", 0, default).Protected && new DiskFile("C:\\hiberfil.sys", 0, default).Protected, "System file unlabelled");
             Assert(!new DiskFile(Path.Combine(root, "pagefile.sys"), 0, default).Protected, "Ordinary names mislabelled");
         });
+        Test("System reserve stays in totals but never enters file or duplicate lists", () =>
+        {
+            var node = new FolderNode("C:\\"); var largest = new PriorityQueue<DiskFile, long>(); var candidates = new List<DiskFile>();
+            var reserve = new[] { "C:\\pagefile.sys", "C:\\hiberfil.sys", "C:\\swapfile.sys" };
+            foreach (string path in reserve) DiskScanner.ObserveFile(node, new DiskFile(path, 2 * 1024 * 1024, default), 2 * 1024 * 1024, FileAttributes.Normal, largest, candidates);
+            var normal = new DiskFile("C:\\Users\\example\\pagefile.sys", 3 * 1024 * 1024, default);
+            DiskScanner.ObserveFile(node, normal, normal.Bytes, FileAttributes.Normal, largest, candidates);
+            Assert(node.DirectBytes == 9 * 1024 * 1024 && node.SystemReserveBytes == 6 * 1024 * 1024 && node.Files == 4, "Reserve not reconciled with totals");
+            Assert(largest.Count == 1 && largest.Peek() == normal && candidates.Count == 1 && candidates[0] == normal, "System files exposed or ordinary names hidden");
+        });
         Test("Release parser requires correct repository and SHA-256", () =>
         {
             var updates = new UpdateClient("saymonseo", "chisto");
