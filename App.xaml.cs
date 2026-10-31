@@ -10,11 +10,18 @@ public partial class App : Application
         base.OnStartup(e);
         if (e.Args.FirstOrDefault() == "--self-test")
         {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
             var reportFile = e.Args.ElementAtOrDefault(1) ?? Path.Combine(AppContext.BaseDirectory, "chisto-tests.json");
             var report = SelfTests.Run(Path.GetDirectoryName(Path.GetFullPath(reportFile))!);
             File.WriteAllText(reportFile, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
             Shutdown(report.All(x => x.Passed) ? 0 : 1);
             return;
+        }
+        ThemeManager.Apply(new PreferencesStore().Load().Theme);
+        if (e.Args.FirstOrDefault() == "--render-theme-previews" && e.Args.Length > 1)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            ThemePreview.Export(e.Args[1]); Shutdown(); return;
         }
         var window = new MainWindow();
         MainWindow = window;

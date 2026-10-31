@@ -20,6 +20,9 @@ public partial class MainWindow : Window
     private List<CacheGroup> caches = [];
     private List<DuplicateFile> duplicates = [];
     private readonly string[] palette = ["#416FBA", "#3A8E92", "#6A63A4", "#98764B", "#4A6F86", "#567F67", "#5A67A3", "#866D8C", "#556879", "#647899", "#4F7680", "#6C797B"];
+    private readonly string[] lightPalette = ["#C8DCF8", "#BFE3E0", "#DCD3F1", "#EDDDC4", "#C8DEE9", "#D1E6D4", "#D4DAF4", "#E5D3E5", "#D5E0E9", "#D4DEEE", "#CAE4E7", "#DEE3DA"];
+    private bool changingTheme = true;
+    private Button? selectedNavigation;
     private readonly Stopwatch operationClock = new();
     private readonly DispatcherTimer clock = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly UpdateClient updateClient = UpdateClient.Load();
@@ -32,28 +35,52 @@ public partial class MainWindow : Window
         InitializeComponent();
         MinWidth = Math.Min(MinWidth, SystemParameters.WorkArea.Width - 24); MinHeight = Math.Min(MinHeight, SystemParameters.WorkArea.Height - 24);
         Width = Math.Min(Width, SystemParameters.WorkArea.Width - 32); Height = Math.Min(Height, SystemParameters.WorkArea.Height - 32);
-        SourceInitialized += (_, _) => { int dark = 1; DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, ref dark, 4); };
+        SourceInitialized += (_, _) => ApplyWindowChrome();
         clock.Tick += (_, _) => { if (operation != null) UpdateClock(); };
         UpdateSourceLabel.Text = $"Источник: {updateClient.Owner}/{updateClient.Repository} · GitHub Releases";
         VersionLabel.Text = $"Чисто / {UpdateClient.Current}"; UpdateVersionLabel.Text = $"Чисто {UpdateClient.Current}";
         foreach (var drive in DriveInfo.GetDrives().Where(x => x.IsReady && x.DriveType == DriveType.Fixed)) DrivePicker.Items.Add(drive.Name);
         DrivePicker.SelectedItem = DrivePicker.Items.Contains("C:\\") ? "C:\\" : DrivePicker.Items.Cast<string>().FirstOrDefault();
         ShowPage(MapPage, NavMap);
+        ThemeSelector.SelectedIndex = ThemeManager.IsLight ? 1 : 0; changingTheme = false;
         Closed += (_, _) => operation?.Cancel();
     }
     private void ShowPage(Grid page, Button button)
     {
         foreach (var item in new[] { MapPage, FilesPage, DuplicatesPage, CleanPage, AppDataPage, UpdatesPage }) item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var item in new[] { NavMap, NavFiles, NavDuplicates, NavClean, NavAppData, NavUpdates })
-        {
-            item.Background = item == button ? new SolidColorBrush(Color.FromRgb(30, 49, 77)) : Brushes.Transparent;
-            item.Foreground = item == button ? (Brush)FindResource("Lime") : new SolidColorBrush(Color.FromRgb(155, 174, 203));
-        }
+        selectedNavigation = button; UpdateNavigation();
         PageTitle.Text = page == MapPage ? "Пространство под контролем" : page == FilesPage ? "Крупные файлы" : page == DuplicatesPage ? "Одинаковое содержимое" : page == AppDataPage ? "Что хранят приложения" : page == UpdatesPage ? "Всегда актуальная версия" : "Очистка приложений";
         PageIntro.Text = page == MapPage ? "Карта папок и точный учёт объёма доступных файлов." : page == FilesPage ? "Самые объёмные файлы выбранной области и их расположение." : page == DuplicatesPage ? "Сначала размер, затем SHA-256 всего содержимого." : page == AppDataPage ? "Разберите AppData по приложениям, а не удаляйте её целиком." : page == UpdatesPage ? "Новые версии из вашего репозитория GitHub Releases." : "Предварительный список файлов и отдельное подтверждение удаления.";
         if (page == MapPage) Dispatcher.BeginInvoke(DrawMap);
     }
     private void MapPage_Click(object sender, RoutedEventArgs e) => ShowPage(MapPage, NavMap);
+    private void UpdateNavigation()
+    {
+        foreach (var item in new[] { NavMap, NavFiles, NavDuplicates, NavClean, NavAppData, NavUpdates })
+        {
+            item.Background = item == selectedNavigation ? (Brush)FindResource("NavSelected") : Brushes.Transparent;
+            item.Foreground = (Brush)FindResource(item == selectedNavigation ? "Lime" : "NavText");
+        }
+    }
+    private void Theme_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (changingTheme || ThemeSelector.SelectedItem is not ComboBoxItem item) return;
+        string theme = item.Tag as string == "light" ? "light" : "dark";
+        ApplyTheme(theme);
+        try { new PreferencesStore().Save(new UserPreferences(theme)); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { StatusLabel.Text = "Тема изменена, но сохранить выбор не удалось: " + ex.Message; }
+    }
+    internal void ApplyTheme(string theme)
+    {
+        ThemeManager.Apply(theme); UpdateNavigation(); DrawMap(); ApplyWindowChrome();
+        changingTheme = true; ThemeSelector.SelectedIndex = ThemeManager.IsLight ? 1 : 0; changingTheme = false;
+    }
+    private void ApplyWindowChrome()
+    {
+        IntPtr handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+        int dark = ThemeManager.IsLight ? 0 : 1; DwmSetWindowAttribute(handle, 20, ref dark, 4);
+    }
     private void FilesPage_Click(object sender, RoutedEventArgs e) => ShowPage(FilesPage, NavFiles);
     private void DuplicatesPage_Click(object sender, RoutedEventArgs e) => ShowPage(DuplicatesPage, NavDuplicates);
     private void CleanPage_Click(object sender, RoutedEventArgs e) => ShowPage(CleanPage, NavClean);
@@ -177,7 +204,8 @@ public partial class MainWindow : Window
         if (tiles.Count == 1)
         {
             var tile = tiles[0]; if (w < 7 || h < 7) return;
-            var fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(palette[color % palette.Length]));
+            var colors = ThemeManager.IsLight ? lightPalette : palette;
+            var fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[color % colors.Length]));
             var box = new Border { Background = fill, CornerRadius = new CornerRadius(8), Width = Math.Max(0, w - 5), Height = Math.Max(0, h - 5), Padding = new Thickness(w > 150 ? 17 : 8), ClipToBounds = true, ToolTip = $"{tile.Folder?.Path ?? tile.Name}\n{Format.Size(tile.Bytes)}", Cursor = tile.Folder == null ? Cursors.Arrow : Cursors.Hand };
             if (w > 70 && h > 45)
             {

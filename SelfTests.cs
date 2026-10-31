@@ -135,6 +135,37 @@ public static class SelfTests
             { bool rejected = false; try { updates.Parse(Json(url,digest)); } catch (IOException) { rejected = true; } Assert(rejected,"Foreign download accepted"); }
             bool badHash = false; try { updates.Parse(Json(valid,"")); } catch (IOException) { badHash = true; } Assert(badHash,"Missing hash accepted");
         });
+        Test("Theme preference survives reload and invalid settings fall back safely", () =>
+        {
+            string file = Path.Combine(root, "preferences", "preferences.json"); var store = new PreferencesStore(file);
+            Assert(store.Load().Theme == "dark", "Missing settings must preserve default dark theme");
+            store.Save(new UserPreferences("light")); Assert(new PreferencesStore(file).Load().Theme == "light", "Light preference lost on reload");
+            store.Save(new UserPreferences("dark")); Assert(new PreferencesStore(file).Load().Theme == "dark", "Dark preference lost on reload");
+            File.WriteAllText(file, "broken json"); Assert(store.Load().Theme == "dark", "Corrupt preferences crashed or had invalid fallback");
+            File.WriteAllText(file, "{\"theme\":\"unknown\"}"); Assert(store.Load().Theme == "dark", "Invalid theme accepted");
+        });
+        Test("Live theme change updates existing panels, text, buttons and grids", () =>
+        {
+            bool wasLight = ThemeManager.IsLight;
+            System.Windows.Window? host = null;
+            try
+            {
+                ThemeManager.Apply("dark");
+                var panel = new System.Windows.Controls.Border { Style = (System.Windows.Style)System.Windows.Application.Current.FindResource("Panel") };
+                var button = new System.Windows.Controls.Button { Style = (System.Windows.Style)System.Windows.Application.Current.FindResource("Primary") };
+                var grid = new System.Windows.Controls.DataGrid { Style = (System.Windows.Style)System.Windows.Application.Current.FindResource(typeof(System.Windows.Controls.DataGrid)) };
+                var text = new System.Windows.Controls.TextBlock(); text.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Ink");
+                var content = new System.Windows.Controls.StackPanel(); content.Children.Add(panel); content.Children.Add(button); content.Children.Add(grid); content.Children.Add(text);
+                host = new System.Windows.Window { Content = content };
+                static string Hex(System.Windows.Media.Brush brush) => ((System.Windows.Media.SolidColorBrush)brush).Color.ToString();
+                Assert(Hex(panel.Background) == "#FF121A28" && Hex(text.Foreground) == "#FFE8EEF9", "Wrong dark colors");
+                ThemeManager.Apply("light");
+                Assert(Hex(panel.Background) == "#FFFFFFFF" && Hex(grid.Background) == "#FFFFFFFF" && Hex(text.Foreground) == "#FF17263F", $"Existing views did not switch to light: panel={Hex(panel.Background)}, grid={Hex(grid.Background)}, text={Hex(text.Foreground)}");
+                Assert(Hex(button.Background) == "#FF2F6FDA" && Hex(button.Foreground) == "#FFFFFFFF", "Light button contrast is incorrect");
+                ThemeManager.Apply("dark"); Assert(Hex(panel.Background) == "#FF121A28" && Hex(text.Foreground) == "#FFE8EEF9", "Switching back failed");
+            }
+            finally { host?.Close(); ThemeManager.Apply(wasLight ? "light" : "dark"); }
+        });
         try { Directory.Delete(root, true); } catch (Exception ex) { outcomes.Add(new TestOutcome("Fixture cleanup", false, ex.Message)); }
         return outcomes;
     }

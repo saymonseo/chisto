@@ -8,9 +8,9 @@
       <Setter Property="FontFamily" Value="Segoe UI" />
     </Style>
     <Style TargetType="Button">
-      <Setter Property="Background" Value="#111824" />
-      <Setter Property="Foreground" Value="{StaticResource Ink}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="Background" Value="{DynamicResource Theme_111824}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="Padding" Value="16,10" />
       <Setter Property="Cursor" Value="Hand" />
@@ -29,7 +29,7 @@
                 <Setter TargetName="Box" Property="Opacity" Value="0.38" />
               </Trigger>
               <Trigger Property="IsKeyboardFocused" Value="True">
-                <Setter TargetName="Box" Property="BorderBrush" Value="#83B5FF" />
+                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Theme_83B5FF}" />
                 <Setter TargetName="Box" Property="BorderThickness" Value="2" />
               </Trigger>
             </ControlTemplate.Triggers>
@@ -38,14 +38,14 @@
       </Setter>
     </Style>
     <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="Foreground" Value="#081426" />
-      <Setter Property="Background" Value="{StaticResource Lime}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Lime}" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_081426}" />
+      <Setter Property="Background" Value="{DynamicResource Lime}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Lime}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style x:Key="Nav" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#B9C7DE" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_B9C7DE}" />
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="Margin" Value="0,3" />
@@ -60,11 +60,11 @@
       <Setter Property="HeadersVisibility" Value="Column" />
       <Setter Property="GridLinesVisibility" Value="None" />
       <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Background" Value="#111824" />
-      <Setter Property="RowBackground" Value="#111824" />
-      <Setter Property="AlternatingRowBackground" Value="#141B28" />
+      <Setter Property="Background" Value="{DynamicResource Theme_111824}" />
+      <Setter Property="RowBackground" Value="{DynamicResource Theme_111824}" />
+      <Setter Property="AlternatingRowBackground" Value="{DynamicResource Theme_141B28}" />
       <Setter Property="RowHeight" Value="46" />
-      <Setter Property="Foreground" Value="#E8EEF9" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_E8EEF9}" />
       <Setter Property="ColumnHeaderHeight" Value="38" />
       <Setter Property="FontSize" Value="13" />
       <Setter Property="EnableRowVirtualization" Value="True" />
@@ -72,8 +72,8 @@
       <Setter Property="SelectionMode" Value="Single" />
     </Style>
     <Style TargetType="DataGridColumnHeader">
-      <Setter Property="Background" Value="#182131" />
-      <Setter Property="Foreground" Value="#91A0B8" />
+      <Setter Property="Background" Value="{DynamicResource Theme_182131}" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_91A0B8}" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="12,8" />
       <Setter Property="FontSize" Value="11" />
@@ -85,27 +85,27 @@
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Style.Triggers>
         <Trigger Property="IsSelected" Value="True">
-          <Setter Property="Background" Value="#223D62" />
-          <Setter Property="Foreground" Value="#E8EEF9" />
+          <Setter Property="Background" Value="{DynamicResource Theme_223D62}" />
+          <Setter Property="Foreground" Value="{DynamicResource Theme_E8EEF9}" />
         </Trigger>
       </Style.Triggers>
     </Style>
     <Style TargetType="TextBox">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Foreground" Value="#E8EEF9" />
-      <Setter Property="Background" Value="#111824" />
-      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_E8EEF9}" />
+      <Setter Property="Background" Value="{DynamicResource Theme_111824}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="FontSize" Value="13" />
     </Style>
     <Style x:Key="Panel" TargetType="Border">
-      <Setter Property="Background" Value="#121A28" />
-      <Setter Property="BorderBrush" Value="#263247" />
+      <Setter Property="Background" Value="{DynamicResource Theme_121A28}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Theme_263247}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="14" />
     </Style>
     <Style x:Key="Subtle" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="#91A0B8" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_91A0B8}" />
       <Setter Property="FontSize" Value="12" />
     </Style>
     <Style x:Key="Title" TargetType="TextBlock">
@@ -114,22 +114,22 @@
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style TargetType="DataGridRow">
-      <Setter Property="Foreground" Value="#E8EEF9" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_E8EEF9}" />
       <Style.Triggers>
         <Trigger Property="IsSelected" Value="True">
-          <Setter Property="Background" Value="#223D62" />
+          <Setter Property="Background" Value="{DynamicResource Theme_223D62}" />
         </Trigger>
       </Style.Triggers>
     </Style>
     <Style TargetType="ComboBoxItem">
-      <Setter Property="Background" Value="#182131" />
-      <Setter Property="Foreground" Value="#E8EEF9" />
+      <Setter Property="Background" Value="{DynamicResource Theme_182131}" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_E8EEF9}" />
       <Setter Property="Padding" Value="12,9" />
     </Style>
     <Style TargetType="ComboBox">
-      <Setter Property="Background" Value="#111824" />
-      <Setter Property="Foreground" Value="#E8EEF9" />
-      <Setter Property="BorderBrush" Value="#283347" />
+      <Setter Property="Background" Value="{DynamicResource Theme_111824}" />
+      <Setter Property="Foreground" Value="{DynamicResource Theme_E8EEF9}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Theme_283347}" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ComboBox">
@@ -143,9 +143,9 @@
                 </ToggleButton.Template>
               </ToggleButton>
               <ContentPresenter Margin="13,0,26,0" VerticalAlignment="Center" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
-              <Path Data="M0,0 L4,4 L8,0" Stroke="#91A0B8" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" IsHitTestVisible="False" />
+              <Path Data="M0,0 L4,4 L8,0" Stroke="{DynamicResource Theme_91A0B8}" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" IsHitTestVisible="False" />
               <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
-                <Border Background="#182131" BorderBrush="#34435C" BorderThickness="1" CornerRadius="8" MinWidth="90">
+                <Border Background="{DynamicResource Theme_182131}" BorderBrush="{DynamicResource Theme_34435C}" BorderThickness="1" CornerRadius="8" MinWidth="90">
                   <StackPanel IsItemsHost="True" />
                 </Border>
               </Popup>
@@ -166,7 +166,7 @@
     </Style>
     <Style TargetType="ScrollBar">
       <Setter Property="Width" Value="9" />
-      <Setter Property="Background" Value="#101724" />
+      <Setter Property="Background" Value="{DynamicResource Theme_101724}" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ScrollBar">
@@ -179,7 +179,7 @@
                   <Thumb>
                     <Thumb.Template>
                       <ControlTemplate TargetType="Thumb">
-                        <Border Background="#425572" CornerRadius="4" Margin="1" />
+                        <Border Background="{DynamicResource Theme_425572}" CornerRadius="4" Margin="1" />
                       </ControlTemplate>
                     </Thumb.Template>
                   </Thumb>
