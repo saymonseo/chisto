@@ -42,8 +42,27 @@ Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{userprograms}\Чисто\Чисто"; Filename: "{app}\Chisto.exe"
 Name: "{userdesktop}\Чисто"; Filename: "{app}\Chisto.exe"; Tasks: desktopicon
 [Run]
-Filename: "{app}\Chisto.exe"; Description: "Запустить Чисто"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Chisto.exe"; Description: "Запустить Чисто"; Flags: nowait postinstall skipifsilent; Check: not IsApplicationUpdate
+Filename: "{app}\Chisto.exe"; WorkingDir: "{app}"; Flags: nowait; Check: IsApplicationUpdate
 [Code]
+function IsApplicationUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:CHISTOUPDATE|0}') = '1';
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Command, Expected: String;
+begin
+  if CurUninstallStep = usUninstall then begin
+    if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Chisto', Command) then begin
+      Expected := '"' + ExpandConstant('{app}\Chisto.exe') + '"';
+      if Pos(Lowercase(Expected), Lowercase(Command)) = 1 then
+        RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Chisto');
+    end;
+  end;
+end;
+
 function DefaultInstallDir(Param: String): String;
 begin
   if DirExists('D:\') then Result := 'D:\Programs\Chisto'

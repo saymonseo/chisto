@@ -4,7 +4,15 @@ using System.Windows;
 using System.Windows.Media;
 
 namespace Chisto;
-public sealed record UserPreferences(string Theme = "dark");
+public sealed record UserPreferences(string Theme = "dark", string DefaultScanPath = "C:\\", bool AutoScanOnLaunch = false, bool StartMinimized = false, int CacheMinAgeHours = 24)
+{
+    public UserPreferences Normalized() => this with
+    {
+        Theme = Theme == "light" ? "light" : "dark",
+        DefaultScanPath = !string.IsNullOrWhiteSpace(DefaultScanPath) && Path.IsPathFullyQualified(DefaultScanPath) ? DefaultScanPath : "C:\\",
+        CacheMinAgeHours = new[] {24,72,168,720}.Contains(CacheMinAgeHours) ? CacheMinAgeHours : 24
+    };
+}
 public sealed class PreferencesStore
 {
     private readonly string path;
@@ -15,7 +23,7 @@ public sealed class PreferencesStore
         try
         {
             var value = JsonSerializer.Deserialize<UserPreferences>(File.ReadAllText(path), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return new UserPreferences(value?.Theme == "light" ? "light" : "dark");
+            return (value ?? new UserPreferences()).Normalized();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return new UserPreferences(); }
     }
@@ -26,7 +34,7 @@ public sealed class PreferencesStore
         string temporary = Path.Combine(directory, ".preferences-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
-            File.WriteAllText(temporary, JsonSerializer.Serialize(new UserPreferences(preferences.Theme == "light" ? "light" : "dark")));
+            File.WriteAllText(temporary, JsonSerializer.Serialize(preferences.Normalized()));
             File.Move(temporary, path, true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }

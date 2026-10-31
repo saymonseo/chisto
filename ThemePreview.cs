@@ -17,9 +17,11 @@ internal static class ThemePreview
         {
             var view = (FrameworkElement)window.Content;
             view.Width = 1280; view.Height = 820;
-            foreach (string theme in new[] { "dark", "light" })
+            foreach (string theme in new[] { "dark", "light", "settings-light", "updates-light" })
             {
-                window.ApplyTheme(theme);
+                window.ApplyTheme(theme == "dark" ? "dark" : "light");
+                if (theme == "settings-light") window.ShowSettingsPreview();
+                if (theme == "updates-light") window.ShowUpdatesPreview();
                 view.Measure(new Size(1280, 820)); view.Arrange(new Rect(0, 0, 1280, 820)); view.UpdateLayout();
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle); view.UpdateLayout();
                 var surface = new DrawingVisual();

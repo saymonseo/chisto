@@ -225,11 +225,11 @@ public sealed class CacheCleaner
     private readonly Dictionary<string, CacheRule> rules;
     internal CacheCleaner(IEnumerable<CacheRule> knownRules) => rules = knownRules.ToDictionary(x => x.Id);
     public IReadOnlyCollection<CacheRule> Definitions => rules.Values;
-    public static CacheCleaner ForThisUser()
+    public static CacheCleaner ForThisUser(int minimumAgeHours = 24)
     {
-        return ForPaths(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+        return ForPaths(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), minimumAgeHours);
     }
-    internal static CacheCleaner ForPaths(string local, string roaming)
+    internal static CacheCleaner ForPaths(string local, string roaming, int minimumAgeHours = 24)
     {
         var rules = new List<CacheRule> { new("temp", "Временные файлы", [Path.Combine(local, "Temp")], Description: "Temp текущего пользователя. Занятые, новые и изменённые файлы пропускаются.") };
         foreach (var browser in new[] { ("chrome", "Google Chrome", "Google\\Chrome\\User Data", "chrome"), ("edge", "Microsoft Edge", "Microsoft\\Edge\\User Data", "msedge"), ("brave", "Brave", "BraveSoftware\\Brave-Browser\\User Data", "brave"), ("yandex", "Яндекс Браузер", "Yandex\\YandexBrowser\\User Data", "browser") })
@@ -260,7 +260,8 @@ public sealed class CacheCleaner
         Add("pip", "Python · pip", Path.Combine(local, "pip", "Cache"), null, "Загруженные HTTP-ответы и wheels. Пакеты не удаляются; при следующей установке данные могут скачаться снова.", "http", "http-v2", "wheels");
         Add("crashdumps", "Дампы сбоев приложений", local, null, "Диагностические дампы CrashDumps старше 7 дней. Могут понадобиться для разбора сбоя.", "CrashDumps");
         if (rules.LastOrDefault()?.Id == "crashdumps") rules[^1] = rules[^1] with { MinAgeHours = 168 };
-        return new CacheCleaner(rules);
+        int floor = Math.Max(24, minimumAgeHours);
+        return new CacheCleaner(rules.Select(rule => rule with { MinAgeHours = Math.Max(rule.MinAgeHours, floor) }));
     }
     public static bool Running(string name) { var processes = Process.GetProcessesByName(name); try { return processes.Length > 0; } finally { foreach (var p in processes) p.Dispose(); } }
     public List<CacheGroup> Preview(CancellationToken token)

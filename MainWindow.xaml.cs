@@ -16,7 +16,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? operation;
     private ScanResult? scan;
     private FolderNode? currentFolder;
-    private readonly CacheCleaner cleaner = CacheCleaner.ForThisUser();
+    private CacheCleaner cleaner = CacheCleaner.ForThisUser();
     private List<CacheGroup> caches = [];
     private List<DuplicateFile> duplicates = [];
     private readonly string[] palette = ["#416FBA", "#3A8E92", "#6A63A4", "#98764B", "#4A6F86", "#567F67", "#5A67A3", "#866D8C", "#556879", "#647899", "#4F7680", "#6C797B"];
@@ -42,38 +42,48 @@ public partial class MainWindow : Window
         foreach (var drive in DriveInfo.GetDrives().Where(x => x.IsReady && x.DriveType == DriveType.Fixed)) DrivePicker.Items.Add(drive.Name);
         DrivePicker.SelectedItem = DrivePicker.Items.Contains("C:\\") ? "C:\\" : DrivePicker.Items.Cast<string>().FirstOrDefault();
         ShowPage(MapPage, NavMap);
-        ThemeSelector.SelectedIndex = ThemeManager.IsLight ? 1 : 0; changingTheme = false;
+        cleaner = CacheCleaner.ForThisUser(preferences.CacheMinAgeHours);
+        LoadSettings(); changingTheme = false;
+        if (Directory.Exists(preferences.DefaultScanPath))
+        {
+            string? drive = Path.GetPathRoot(preferences.DefaultScanPath); if (DrivePicker.Items.Contains(drive)) DrivePicker.SelectedItem = drive;
+            ChangeRoot(preferences.DefaultScanPath);
+        }
         Closed += (_, _) => operation?.Cancel();
     }
     private void ShowPage(Grid page, Button button)
     {
-        foreach (var item in new[] { MapPage, FilesPage, DuplicatesPage, CleanPage, AppDataPage, UpdatesPage }) item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var item in new[] { MapPage, FilesPage, DuplicatesPage, CleanPage, AppDataPage, UpdatesPage, SettingsPage }) item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
+        AnalysisToolbar.Visibility = page == SettingsPage || page == UpdatesPage ? Visibility.Collapsed : Visibility.Visible;
         selectedNavigation = button; UpdateNavigation();
-        PageTitle.Text = page == MapPage ? "Пространство под контролем" : page == FilesPage ? "Крупные файлы" : page == DuplicatesPage ? "Одинаковое содержимое" : page == AppDataPage ? "Что хранят приложения" : page == UpdatesPage ? "Всегда актуальная версия" : "Очистка приложений";
-        PageIntro.Text = page == MapPage ? "Карта папок и точный учёт объёма доступных файлов." : page == FilesPage ? "Самые объёмные файлы выбранной области и их расположение." : page == DuplicatesPage ? "Сначала размер, затем SHA-256 всего содержимого." : page == AppDataPage ? "Разберите AppData по приложениям, а не удаляйте её целиком." : page == UpdatesPage ? "Новые версии из вашего репозитория GitHub Releases." : "Предварительный список файлов и отдельное подтверждение удаления.";
+        PageTitle.Text = page == SettingsPage ? "Настройки программы" : page == MapPage ? "Пространство под контролем" : page == FilesPage ? "Крупные файлы" : page == DuplicatesPage ? "Одинаковое содержимое" : page == AppDataPage ? "Что хранят приложения" : page == UpdatesPage ? "Всегда актуальная версия" : "Очистка приложений";
+        PageIntro.Text = page == SettingsPage ? "Оформление, запуск и правила очистки." : page == MapPage ? "Карта папок и точный учёт объёма доступных файлов." : page == FilesPage ? "Самые объёмные файлы выбранной области и их расположение." : page == DuplicatesPage ? "Сначала размер, затем SHA-256 всего содержимого." : page == AppDataPage ? "Разберите AppData по приложениям, а не удаляйте её целиком." : page == UpdatesPage ? "Новые версии из вашего репозитория GitHub Releases." : "Предварительный список файлов и отдельное подтверждение удаления.";
         if (page == MapPage) Dispatcher.BeginInvoke(DrawMap);
+        RefreshOperationPanel();
     }
+    private void RefreshOperationPanel() => OperationPanel.Visibility = operation == null && (SettingsPage.Visibility == Visibility.Visible || UpdatesPage.Visibility == Visibility.Visible) ? Visibility.Collapsed : Visibility.Visible;
     private void MapPage_Click(object sender, RoutedEventArgs e) => ShowPage(MapPage, NavMap);
     private void UpdateNavigation()
     {
-        foreach (var item in new[] { NavMap, NavFiles, NavDuplicates, NavClean, NavAppData, NavUpdates })
+        foreach (var item in new[] { NavMap, NavFiles, NavDuplicates, NavClean, NavAppData, NavUpdates, NavSettings })
         {
             item.Background = item == selectedNavigation ? (Brush)FindResource("NavSelected") : Brushes.Transparent;
             item.Foreground = (Brush)FindResource(item == selectedNavigation ? "Lime" : "NavText");
         }
     }
-    private void Theme_Changed(object sender, SelectionChangedEventArgs e)
+    private void Theme_Changed(object sender, RoutedEventArgs e)
     {
-        if (changingTheme || ThemeSelector.SelectedItem is not ComboBoxItem item) return;
-        string theme = item.Tag as string == "light" ? "light" : "dark";
+        if (changingTheme || sender is not System.Windows.Controls.Primitives.ToggleButton item) return;
+        string theme = item.IsChecked == true ? "light" : "dark";
         ApplyTheme(theme);
-        try { new PreferencesStore().Save(new UserPreferences(theme)); }
+        try { preferences = new PreferencesStore().Load() with { Theme = theme }; new PreferencesStore().Save(preferences); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { StatusLabel.Text = "Тема изменена, но сохранить выбор не удалось: " + ex.Message; }
     }
     internal void ApplyTheme(string theme)
     {
         ThemeManager.Apply(theme); UpdateNavigation(); DrawMap(); ApplyWindowChrome();
-        changingTheme = true; ThemeSelector.SelectedIndex = ThemeManager.IsLight ? 1 : 0; changingTheme = false;
+        changingTheme = true; ThemeToggle.IsChecked = SettingsThemeToggle.IsChecked = ThemeManager.IsLight; changingTheme = false;
+        ThemeToggle.ToolTip = ThemeManager.IsLight ? "Светлая тема. Переключить на тёмную" : "Тёмная тема. Переключить на светлую";
     }
     private void ApplyWindowChrome()
     {
@@ -130,7 +140,8 @@ public partial class MainWindow : Window
     {
         if (operation != null) return false;
         operation = new CancellationTokenSource();
-        foreach (var button in new[] { ScanButton, FolderButton, FindDuplicatesButton, PreviewButton, CleanButton, AuditButton, CheckUpdateButton, InstallUpdateButton }) button.IsEnabled = false;
+        RefreshOperationPanel();
+        foreach (var button in new[] { ScanButton, FolderButton, FindDuplicatesButton, PreviewButton, CleanButton, AuditButton, CheckUpdateButton, InstallUpdateButton, SaveSettingsButton }) button.IsEnabled = false;
         DrivePicker.IsEnabled = false; WorkBar.Visibility = Visibility.Visible; WorkBar.IsIndeterminate = true; CancelButton.Visibility = Visibility.Visible;
         lastEta = null; lastProgressElapsed = TimeSpan.Zero; operationClock.Restart(); clock.Start(); OperationTitle.Text = "Подготовка"; PercentLabel.Text = "—"; RemainingLabel.Text = "Осталось —"; ProgressCount.Text = "Определяем объём работы…"; TimeLabel.Text = "Прошло 0 сек · Осталось —";
         return true;
@@ -138,10 +149,11 @@ public partial class MainWindow : Window
     private void EndOperation()
     {
         operation?.Dispose(); operation = null;
-        foreach (var button in new[] { ScanButton, FolderButton, FindDuplicatesButton, PreviewButton, AuditButton, CheckUpdateButton }) button.IsEnabled = true;
+        foreach (var button in new[] { ScanButton, FolderButton, FindDuplicatesButton, PreviewButton, AuditButton, CheckUpdateButton, SaveSettingsButton }) button.IsEnabled = true;
         CleanButton.IsEnabled = caches.Any(x => x.Files.Count > 0); DrivePicker.IsEnabled = true;
         WorkBar.IsIndeterminate = false; CancelButton.Visibility = Visibility.Collapsed; clock.Stop(); operationClock.Stop();
         InstallUpdateButton.IsEnabled = availableUpdate != null;
+        RefreshOperationPanel();
     }
     private void Cancel_Click(object sender, RoutedEventArgs e) { operation?.Cancel(); StatusLabel.Text = "Останавливаем текущую операцию…"; }
     private async void Scan_Click(object sender, RoutedEventArgs e) => await StartScan(RootBox.Text);
@@ -353,26 +365,39 @@ public partial class MainWindow : Window
         try
         {
             availableUpdate = await updateClient.Check(operation!.Token);
-            UpdateStatus.Text = availableUpdate == null ? $"Установлена актуальная версия {UpdateClient.Current}." : $"Доступна версия {availableUpdate.Version} · {Format.Size(availableUpdate.Bytes)}. Установщик будет проверен по SHA-256.";
+            UpdateStatus.Text = availableUpdate == null ? $"Установлена актуальная версия {UpdateClient.Current}." : $"Доступна версия {availableUpdate.Version} · {Format.Size(availableUpdate.Bytes)}. Нажмите «Обновить приложение».";
             OperationTitle.Text = "Проверка обновлений завершена"; PercentLabel.Text = "100%"; WorkBar.Value = 100; RemainingLabel.Text = "Готово";
         }
         catch (OperationCanceledException) { UpdateStatus.Text = operation!.IsCancellationRequested ? "Проверка остановлена." : "GitHub не ответил за отведённое время. Попробуйте позже."; }
         catch (Exception ex) { UpdateStatus.Text = "Не удалось проверить обновления: " + ex.Message; }
         finally { EndOperation(); }
     }
-    private async void DownloadUpdate_Click(object sender, RoutedEventArgs e)
+    private async void UpdateApp_Click(object sender, RoutedEventArgs e)
     {
-        if (availableUpdate == null || !BeginOperation()) return;
-        string? file = null; OperationTitle.Text = "Загрузка обновления"; WorkBar.IsIndeterminate = false;
-        var progress = new Progress<double>(percent => { PercentLabel.Text = $"{percent:N0}%"; WorkBar.Value = percent; RemainingLabel.Text = $"Осталось {100 - percent:N0}%"; ProgressCount.Text = $"Установщик {availableUpdate.Version} · {Format.Size(availableUpdate.Bytes)}"; });
-        try { file = await updateClient.Download(availableUpdate, progress, operation!.Token); UpdateStatus.Text = "SHA-256 проверен. Установщик готов к запуску."; OperationTitle.Text = "Обновление загружено"; }
-        catch (OperationCanceledException) { UpdateStatus.Text = "Загрузка остановлена."; }
-        catch (Exception ex) { UpdateStatus.Text = "Загрузка не завершена: " + ex.Message; }
+        if (availableUpdate == null || operation != null) return;
+        var release = availableUpdate;
+        bool installed;
+        try { installed = UpdateInstallation.IsInstalledHere(AppContext.BaseDirectory); }
+        catch (Exception ex) { UpdateStatus.Text = "Не удалось определить папку обновления: " + ex.Message; return; }
+        string details = installed ? "Программа скачает и проверит обновление, закроет текущее окно и автоматически перезапустится после установки. Сохранённые настройки останутся на месте." : "Сейчас запущена portable-копия. После проверки обновления откроется обычная установка новой версии. Настройки сохранятся.";
+        if (MessageBox.Show(this, $"Обновить Чисто до версии {release.Version}?\n\n" + details + "\n\nWindows может дополнительно запросить подтверждение запуска.", "Обновить приложение", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (!BeginOperation()) return;
+        string? file = null; InstallUpdateButton.Content = "Обновление…"; OperationTitle.Text = "Загрузка обновления"; WorkBar.IsIndeterminate = false;
+        var progress = new Progress<double>(percent => { PercentLabel.Text = $"{Math.Floor(percent):N0}%"; WorkBar.Value = percent; RemainingLabel.Text = $"Осталось {100 - Math.Floor(percent):N0}%"; ProgressCount.Text = $"Обновление {release.Version} · {Format.Size(release.Bytes)}"; });
+        try { file = await updateClient.Download(release, progress, operation!.Token); UpdateStatus.Text = "Обновление проверено. Применяем новую версию…"; OperationTitle.Text = "Применение обновления"; }
+        catch (OperationCanceledException) { UpdateStatus.Text = "Обновление остановлено."; }
+        catch (Exception ex) { UpdateStatus.Text = "Обновление не завершено: " + ex.Message; }
         finally { EndOperation(); }
-        if (file != null && MessageBox.Show(this, "Установщик загружен и проверен. Запустить установку новой версии?\n\nТекущее окно «Чисто» будет закрыто. Windows может дополнительно запросить подтверждение.", "Обновление Чисто", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
+        InstallUpdateButton.Content = "Обновить приложение";
+        if (file != null)
         {
-            try { Process.Start(new ProcessStartInfo(file) { UseShellExecute = true }); Close(); }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Не удалось запустить установщик"); }
+            try
+            {
+                var setup = Process.Start(UpdateInstallation.Plan(file, AppContext.BaseDirectory, installed));
+                if (setup == null) throw new IOException("Windows не запустила обновление.");
+                Close();
+            }
+            catch (Exception ex) { UpdateStatus.Text = "Обновление не запущено: " + ex.Message; }
         }
     }
 }

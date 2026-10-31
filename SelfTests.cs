@@ -144,6 +144,51 @@ public static class SelfTests
             File.WriteAllText(file, "broken json"); Assert(store.Load().Theme == "dark", "Corrupt preferences crashed or had invalid fallback");
             File.WriteAllText(file, "{\"theme\":\"unknown\"}"); Assert(store.Load().Theme == "dark", "Invalid theme accepted");
         });
+        Test("Settings migrate old preferences and preserve fields when theme changes", () =>
+        {
+            string file = Path.Combine(root,"settings.json"); var store = new PreferencesStore(file);
+            File.WriteAllText(file,"{\"Theme\":\"light\"}"); var old = store.Load();
+            Assert(old.Theme == "light" && old.CacheMinAgeHours == 24 && !old.AutoScanOnLaunch && !old.StartMinimized, "Old settings failed to migrate");
+            var settings = new UserPreferences("light",root,true,true,168); store.Save(settings);
+            store.Save(store.Load() with { Theme = "dark" }); var loaded = store.Load();
+            Assert(loaded == settings with { Theme = "dark" }, "Changing theme lost another preference");
+            store.Save(settings with { CacheMinAgeHours=0,DefaultScanPath="relative" }); loaded=store.Load();
+            Assert(loaded.CacheMinAgeHours==24 && Path.IsPathFullyQualified(loaded.DefaultScanPath), "Unsafe settings not normalized");
+        });
+        Test("Startup registration changes only the owned value in an isolated registry fixture", () =>
+        {
+            string key = @"Software\Chisto.Tests\" + Guid.NewGuid().ToString("N") + @"\Run";
+            string fixtureRoot = key[..key.LastIndexOf('\\')];
+            try
+            {
+                using(var existing=Microsoft.Win32.Registry.CurrentUser.CreateSubKey(key)) existing.SetValue("OtherApp","keep");
+                string exe=Path.Combine(root,"Startup App.exe"); File.WriteAllText(exe,"fixture; not executed");
+                var startup=new WindowsStartup(key); Assert(!startup.Enabled,"Unexpected initial startup");
+                startup.SetEnabled(true,exe); Assert(startup.Enabled && startup.Command()=="\""+exe+"\" --startup","Bad startup command quoting");
+                startup.SetEnabled(false,exe); using var check=Microsoft.Win32.Registry.CurrentUser.OpenSubKey(key);
+                Assert(!startup.Enabled && (string?)check?.GetValue("OtherApp")=="keep","Other startup data modified");
+            }
+            finally { Assert(fixtureRoot.StartsWith(@"Software\Chisto.Tests\",StringComparison.Ordinal),"Unsafe fixture cleanup"); Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(fixtureRoot,false); }
+        });
+        Test("Configured cache age is enforced again at deletion", () =>
+        {
+            string local=Path.Combine(root,"AgeLocal"), temp=Path.Combine(local,"Temp"); Directory.CreateDirectory(temp);
+            string young=Path.Combine(temp,"two-days.tmp"),old=Path.Combine(temp,"four-days.tmp");
+            foreach(string p in new[]{young,old}) { File.WriteAllText(p,"fixture"); File.SetLastWriteTimeUtc(p,DateTime.UtcNow.AddDays(p==young?-2:-4)); }
+            var instance=CacheCleaner.ForPaths(local,Path.Combine(root,"AgeRoaming"),72); var files=instance.Preview(CancellationToken.None).SelectMany(x=>x.Files).ToList();
+            Assert(files.Count==1&&files[0].Path==old,"Age setting not applied to preview");
+            var info=new FileInfo(young); var forged=new CacheFile(young,temp,"temp",info.Length,info.LastWriteTimeUtc);
+            var cleaned=instance.Clean(files.Append(forged),null,CancellationToken.None);
+            Assert(cleaned.Deleted==1&&File.Exists(young),"Age setting bypassed during deletion");
+        });
+        Test("Installed update plan targets the current folder and preserves Windows launch checks", () =>
+        {
+            string setup=Path.Combine(root,"setup.exe"), target=Path.Combine(root,"Installed App");
+            var plan=UpdateInstallation.Plan(setup,target,true);
+            Assert(plan.UseShellExecute && plan.ArgumentList.Contains("/SILENT") && plan.ArgumentList.Contains("/NORESTART") && plan.ArgumentList.Contains("/CHISTOUPDATE=1") && plan.ArgumentList.Contains("/DIR="+target),"Incomplete upgrade plan");
+            var portable=UpdateInstallation.Plan(setup,target,false);
+            Assert(portable.ArgumentList.Count==0,"Portable copy silently converted to installed");
+        });
         Test("Live theme change updates existing panels, text, buttons and grids", () =>
         {
             bool wasLight = ThemeManager.IsLight;
