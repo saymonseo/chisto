@@ -1,0 +1,11 @@
+* text=auto
+*.cs text eol=lf
+*.xaml text eol=lf
+*.csproj text eol=lf
+*.ps1 text eol=lf
+*.iss text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.ico binary
+*.png binary

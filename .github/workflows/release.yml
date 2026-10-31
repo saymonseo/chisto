@@ -1,0 +1,28 @@
+name: Windows release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and test
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content ./Chisto.csproj
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$($project.Project.PropertyGroup.Version)") { throw 'Tag and project version do not match' }
+          ./build-release.ps1 -OutputDirectory ./artifacts
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME ./artifacts/Chisto-Setup-*.exe ./artifacts/Chisto-portable-*.zip ./artifacts/SHA256SUMS.txt --verify-tag --title "Чисто $env:GITHUB_REF_NAME" --generate-notes
